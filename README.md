@@ -2,6 +2,10 @@
 
 한국 상장사 재무자료를 업로드하면 **멀티 LLM 에이전트**가 비율·이상징후·Beneish/Altman 등을 계산하고, 감사형 요약·히트맵·PDF 리포트까지 제공하는 **MVP 웹앱**입니다. 배포는 **Vercel**, 데이터는 **Neon(PostgreSQL)**·**Vercel Blob**을 전제로 설계했습니다.
 
+### 프로젝트 한 줄 요약
+
+**Big4 스타일 에이전트 워크플로를 경량화한** Next.js 단일 리포: 업로드 → 정규화·비율·스코어링 → GPT/Claude/Gemini/Perplexity 병렬 분석 → Risk 퓨전 → 대시보드·PDF.
+
 ## 주요 기능
 
 - **파일 업로드**: 사업보고서 PDF, 재무제표 XLSX, DART CSV, IR PDF → Blob 저장, Neon에 메타데이터 기록
@@ -87,11 +91,55 @@ npm run dev:5181
 3. **AI 분석 실행** → 완료 후 Risk Score, 히트맵, 이상징후, AI 메모 확인  
 4. **PDF 리포트 생성** → Blob에 저장된 PDF URL로 열기  
 
-## 배포(Vercel)
+## Vercel에서 배포하고 앱 확인하기
 
-- 프로젝트를 Vercel에 연결하고 위 환경 변수를 등록  
-- Inngest 사용 시 앱 URL의 `/api/inngest`를 Inngest 대시보드에 등록  
-- Serverless 시간 제한이 있는 플랜에서는 긴 분석에 Inngest 사용을 권장합니다.
+아래 순서대로 진행하면 **프로덕션 URL**에서 최신 앱을 열 수 있습니다.
+
+### 1. GitHub 저장소 연결
+
+1. [Vercel Dashboard](https://vercel.com/dashboard) → **Add New…** → **Project**  
+2. **Import** 에서 저장소 [junsang-dong/goorm-260512-audit-agent-orchestration](https://github.com/junsang-dong/goorm-260512-audit-agent-orchestration) 선택  
+3. Framework Preset이 **Next.js**인지 확인, Root Directory는 저장소 루트(`.`). **Deploy** 실행  
+
+### 2. 환경 변수 등록
+
+**Project → Settings → Environment Variables** 에서 최소 아래를 넣습니다. (Production과 Preview 모두에 복사하는 것을 권장합니다.)
+
+| 변수 | 설명 |
+|------|------|
+| `DATABASE_URL` | Neon 연결 문자열(Pooled 권장) |
+| `BLOB_READ_WRITE_TOKEN` | Blob 스토어를 프로젝트에 연결했다면 자동 생성된 값 사용 가능. 없으면 스토어 Quickstart의 `.env.local` 탭에서 복사 |
+| `OPENAI_API_KEY` | (선택) GPT·RAG 임베딩 |
+| `ANTHROPIC_API_KEY` / `GOOGLE_GENERATIVE_AI_API_KEY` / `PERPLEXITY_API_KEY` | (선택) 각 에이전트 |
+| `INNGEST_EVENT_KEY` / `INNGEST_SIGNING_KEY` | (선택) 둘 다 있으면 분석이 큐로 실행됨 |
+
+변수 저장 후 **Deployments**에서 최신 배포의 **⋯ → Redeploy** 로 환경 변수가 반영된 빌드를 다시 돌립니다.
+
+### 3. Neon 스키마 반영(최초 1회)
+
+배포된 앱이 DB에 접속하려면 **테이블이 Neon에 있어야** 합니다. 로컬에서 프로덕션용 `DATABASE_URL`을 가리키거나, Neon SQL Editor에서 `drizzle/*.sql`을 적용하는 방식 중 하나를 택합니다.
+
+```bash
+# 로컬 .env에 Vercel과 동일한 DATABASE_URL을 잠시 넣고
+npm run db:push
+npm run db:seed
+```
+
+### 4. 배포 URL에서 동작 확인
+
+1. Vercel 프로젝트 **Deployments** → 성공한 배포를 열어 **Visit** 로 프로덕션 도메인 접속  
+2. 홈에서 **분석 세션 만들기** → 상세 페이지에서 **데모 재무팩트 주입** → **AI 분석 실행**  
+3. 상태가 `done`이면 Risk Score·히트맵 등이 보입니다.  
+4. **PDF 리포트 생성**은 `BLOB_READ_WRITE_TOKEN`이 배포 환경에 있어야 합니다.
+
+### 5. (선택) Inngest
+
+Inngest 키를 넣었다면 [Inngest](https://app.inngest.com/)에서 앱의 **App URL**을 `https://<배포도메인>/api/inngest` 로 등록·동기화합니다. 키가 없으면 분석은 **동기**로 Route Handler에서 실행됩니다(Vercel 함수 시간 제한에 유의).
+
+### 참고
+
+- Vercel Hobby 등에서는 **함수 실행 시간**이 짧아 긴 분석은 Inngest 사용을 권장합니다.  
+- 공식 문서: [Vercel + Next.js](https://vercel.com/docs/frameworks/nextjs), [Vercel Blob](https://vercel.com/docs/storage/vercel-blob)
 
 ## 원격 저장소
 
