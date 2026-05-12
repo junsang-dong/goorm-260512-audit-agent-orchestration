@@ -27,7 +27,21 @@ export function UploadDashboard() {
           industry,
         }),
       });
-      const data = await res.json();
+      const raw = await res.text();
+      let data: { id?: string; error?: string } = {};
+      if (raw.trim()) {
+        try {
+          data = JSON.parse(raw) as typeof data;
+        } catch {
+          throw new Error(
+            res.status >= 500
+              ? `서버 오류(${res.status}). 응답이 JSON이 아닙니다.`
+              : "응답 파싱에 실패했습니다.",
+          );
+        }
+      } else if (!res.ok) {
+        throw new Error(`서버 오류(${res.status}). 응답 본문이 비어 있습니다.`);
+      }
       if (!res.ok) throw new Error(data.error ?? "생성 실패");
       router.push(`/runs/${data.id}`);
     } catch (e) {
